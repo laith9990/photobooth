@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111111">
+<title>صورتك 📸</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: #111; color: #fff; font-family: Tahoma, "Segoe UI", Arial, sans-serif; }
+  main { max-width: 560px; margin: 0 auto; padding: 16px 16px 32px; text-align: center; }
+  #ph { display: block; max-width: 100%; max-height: 64vh; margin: 0 auto; border-radius: 12px; box-shadow: 0 6px 30px #000; }
+  #wait { padding: 30vh 0; font-size: 18px; opacity: .8; }
+  .big { display: block; width: 100%; margin: 14px auto 6px; color: #fff; padding: 16px; border-radius: 30px; border: 0;
+         font: bold 19px Tahoma, Arial, sans-serif; cursor: pointer; }
+  .apps button { display: inline-block; padding: 10px 16px; border-radius: 22px; border: 0; margin: 4px; cursor: pointer;
+                 font: 15px Tahoma, Arial, sans-serif; color: #fff; }
+  .muted { opacity: .8; font-size: 14px; margin: 14px 0 6px; }
+  #dl { color: #7cc4ff; font-size: 15px; display: inline-block; margin-top: 14px; }
+  #hint { opacity: .8; font-size: 14px; line-height: 1.7; margin: 10px auto; min-height: 1em; }
+  video { max-width: 100%; max-height: 70vh; border-radius: 12px; }
+</style>
+</head>
+<body>
+<main>
+  <div id="wait">جارٍ تحميل الصورة… <br><small>Loading your photo…</small></div>
+  <div id="box" hidden>
+    <img id="ph" alt="">
+    <video id="vid" controls playsinline hidden></video>
+    <button id="main" class="big"></button>
+    <p class="muted">أو اختر التطبيق — Or pick an app:</p>
+    <div class="apps" id="apps"></div>
+    <a id="dl" download="photo.jpg">⬇ تحميل الصورة / Download</a>
+    <p id="hint"></p>
+  </div>
+</main>
+<script>
+// the Google Script that stores the photos (same one the photo booth uses)
+var SCRIPT = "https://script.google.com/macros/s/AKfycby-hOPjLgOq1TYNSIk-q4l8QrBXZMyZwiY3021W7Z48GQ32wAo_FJ_vcpQ4cdM2plaE/exec";
+
+var APPS = {
+  instagram: { ar: "إنستغرام", en: "Instagram", bg: "linear-gradient(45deg,#f58529,#dd2a7b,#8134af)", web: "" },
+  facebook:  { ar: "فيسبوك", en: "Facebook", bg: "#1877f2", web: "https://www.facebook.com/sharer/sharer.php?u=" },
+  linkedin:  { ar: "لينكدإن", en: "LinkedIn", bg: "#0a66c2", web: "https://www.linkedin.com/sharing/share-offsite/?url=" },
+  x:         { ar: "إكس", en: "X", bg: "#000", web: "https://twitter.com/intent/tweet?url=" },
+  snapchat:  { ar: "سناب شات", en: "Snapchat", bg: "#f7d600", web: "", dark: true },
+  tiktok:    { ar: "تيك توك", en: "TikTok", bg: "linear-gradient(45deg,#25f4ee,#000 45%,#000 55%,#fe2c55)", web: "" },
+  whatsapp:  { ar: "واتساب", en: "WhatsApp", bg: "#25d366", web: "https://wa.me/?text=" }
+};
+
+var q = new URLSearchParams(location.search);
+var id = (q.get("id") || "").replace(/[^A-Za-z0-9_-]/g, "");
+var app = (q.get("app") || "").toLowerCase();
+var FILE = null, IMG = "https://lh3.googleusercontent.com/d/" + id;
+
+function $(i) { return document.getElementById(i); }
+function hint(t) { $("hint").innerHTML = t; }
+
+function show(d) {
+  $("wait").hidden = true;
+  $("box").hidden = false;
+  var bin = atob(d.b64), u = new Uint8Array(bin.length);
+  for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+  var mime = d.mime || "image/jpeg";
+  var name = d.name || (mime.indexOf("video") === 0 ? "video.mp4" : "photo.jpg");
+  var blob = new Blob([u], { type: mime });
+  var url = URL.createObjectURL(blob);
+  try { FILE = new File([u], name, { type: mime }); } catch (e) {}   // ready before the tap (iPhone needs that)
+  if (mime.indexOf("video") === 0) { $("ph").hidden = true; $("vid").hidden = false; $("vid").src = url; }
+  else { $("ph").src = url; }
+  $("dl").href = url;
+  $("dl").download = name;
+  var A = APPS[app];
+  var m = $("main");
+  m.style.background = A ? A.bg : "linear-gradient(45deg,#f58529,#dd2a7b,#8134af)";
+  m.textContent = A ? ("انشر على " + A.ar + " / Post to " + A.en) : "📤 انشر الصورة / Share";
+  m.onclick = function () { go(A ? app : ""); };
+  var box = $("apps");
+  Object.keys(APPS).forEach(function (k) {
+    var b = document.createElement("button");
+    b.textContent = APPS[k].ar;
+    b.style.background = APPS[k].bg;
+    if (APPS[k].dark) b.style.color = "#111";
+    b.onclick = function () { go(k); };
+    box.appendChild(b);
+  });
+}
+
+function go(k) {
+  var a = APPS[k];
+  if (FILE && navigator.canShare && navigator.canShare({ files: [FILE] })) {
+    if (a) hint("اختر <b>" + a.ar + "</b> من القائمة (اسحب صف التطبيقات إن لم يظهر)، وستفتح الصورة كمنشور جاهز.<br>Pick <b>" + a.en + "</b> in the list — the photo opens as a ready post.");
+    navigator.share({ files: [FILE] }).catch(function (e) { if (e && e.name !== "AbortError") web(k); });
+    return;
+  }
+  web(k);
+}
+
+// no share sheet (computer browser): the site's own share page, or save-and-post steps
+function web(k) {
+  var a = APPS[k];
+  if (a && a.web) { window.open(a.web + encodeURIComponent(IMG), "_blank"); return; }
+  hint("احفظ الصورة (اضغط مطولاً عليها أو «تحميل»)، ثم افتح التطبيق وأضفها كمنشور.<br>Save the photo (long-press or Download), then add it as a post in the app.");
+}
+
+if (!id) {
+  $("wait").innerHTML = "📸";
+} else {
+  fetch(SCRIPT + "?json=1&id=" + encodeURIComponent(id))
+    .then(function (r) { return r.json(); })
+    .then(function (d) { if (!d.ok) throw new Error(d.error || "not found"); show(d); })
+    .catch(function () {
+      $("wait").innerHTML = "تعذّر تحميل الصورة — <a style='color:#7cc4ff' href='" + SCRIPT + "?id=" + id + "'>افتحها من هنا</a>";
+    });
+}
+</script>
+</body>
+</html>
