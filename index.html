@@ -46,7 +46,7 @@ var SCRIPT = "https://script.google.com/macros/s/AKfycby-hOPjLgOq1TYNSIk-q4l8QrB
 var APPS = {
   instagram: { ar: "إنستغرام", en: "Instagram", bg: "linear-gradient(45deg,#f58529,#dd2a7b,#8134af)", web: "" },
   facebook:  { ar: "فيسبوك", en: "Facebook", bg: "#1877f2", web: "https://www.facebook.com/sharer/sharer.php?u=" },
-  linkedin:  { ar: "لينكدإن", en: "LinkedIn", bg: "#0a66c2", web: "https://www.linkedin.com/sharing/share-offsite/?url=", text: true },
+  linkedin:  { ar: "لينكدإن", en: "LinkedIn", bg: "#0a66c2", web: "https://www.linkedin.com/sharing/share-offsite/?url=" },
   x:         { ar: "إكس", en: "X", bg: "#000", web: "https://twitter.com/intent/tweet?url=", text: true },
   snapchat:  { ar: "سناب شات", en: "Snapchat", bg: "#f7d600", web: "", dark: true },
   tiktok:    { ar: "تيك توك", en: "TikTok", bg: "linear-gradient(45deg,#25f4ee,#000 45%,#000 55%,#fe2c55)", web: "" },
@@ -109,7 +109,7 @@ function go(k) {
     var data = { files: [FILE] };
     if (CAPTION && (!a || a.text)) data.text = CAPTION;
     if (CAPTION && data.text && !navigator.canShare(data)) delete data.text;
-    var paste = CAPTION && !data.text ? "<br>📋 النص منسوخ — اضغط مطولاً في خانة الكتابة واختر «لصق». / The caption is copied — paste it in the post." : "";
+    var paste = CAPTION && !data.text ? "<br><b style='color:#7CFC9A;font-size:16px'>✅ النص منسوخ</b> — في المنشور اضغط مطولاً على خانة الكتابة واختر «لصق».<br>The caption is copied — long-press the text box in the post and tap Paste." : "";
     if (a) hint("اختر <b>" + a.ar + "</b> من القائمة (اسحب صف التطبيقات إن لم يظهر)، وستفتح الصورة كمنشور جاهز.<br>Pick <b>" + a.en + "</b> in the list — the photo opens as a ready post." + paste);
     else if (paste) hint(paste.slice(4));
     navigator.share(data).catch(function (e) { if (e && e.name !== "AbortError") web(k); });
