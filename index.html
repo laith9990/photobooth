@@ -20,6 +20,9 @@
   #dl { color: #7cc4ff; font-size: 15px; display: inline-block; margin-top: 14px; }
   #hint { opacity: .8; font-size: 14px; line-height: 1.7; margin: 10px auto; min-height: 1em; }
   video { max-width: 100%; max-height: 70vh; border-radius: 12px; }
+  #cap { background: #1d1d1d; border: 1px solid #333; border-radius: 12px; padding: 12px 14px; margin: 14px auto 4px; text-align: left;
+         direction: ltr; white-space: pre-wrap; font-size: 14px; line-height: 1.6; color: #ddd; }
+  #copy { background: #333; color: #fff; border: 0; border-radius: 18px; padding: 8px 18px; font: 14px Tahoma, Arial, sans-serif; cursor: pointer; }
 </style>
 </head>
 <body>
@@ -29,6 +32,7 @@
     <img id="ph" alt="">
     <video id="vid" controls playsinline hidden></video>
     <button id="main" class="big"></button>
+    <div id="capbox" hidden><div id="cap"></div><button id="copy">📋 نسخ النص / Copy text</button></div>
     <p class="muted">أو اختر التطبيق — Or pick an app:</p>
     <div class="apps" id="apps"></div>
     <a id="dl" download="photo.jpg">⬇ تحميل الصورة / Download</a>
@@ -42,17 +46,17 @@ var SCRIPT = "https://script.google.com/macros/s/AKfycby-hOPjLgOq1TYNSIk-q4l8QrB
 var APPS = {
   instagram: { ar: "إنستغرام", en: "Instagram", bg: "linear-gradient(45deg,#f58529,#dd2a7b,#8134af)", web: "" },
   facebook:  { ar: "فيسبوك", en: "Facebook", bg: "#1877f2", web: "https://www.facebook.com/sharer/sharer.php?u=" },
-  linkedin:  { ar: "لينكدإن", en: "LinkedIn", bg: "#0a66c2", web: "https://www.linkedin.com/sharing/share-offsite/?url=" },
-  x:         { ar: "إكس", en: "X", bg: "#000", web: "https://twitter.com/intent/tweet?url=" },
+  linkedin:  { ar: "لينكدإن", en: "LinkedIn", bg: "#0a66c2", web: "https://www.linkedin.com/sharing/share-offsite/?url=", text: true },
+  x:         { ar: "إكس", en: "X", bg: "#000", web: "https://twitter.com/intent/tweet?url=", text: true },
   snapchat:  { ar: "سناب شات", en: "Snapchat", bg: "#f7d600", web: "", dark: true },
   tiktok:    { ar: "تيك توك", en: "TikTok", bg: "linear-gradient(45deg,#25f4ee,#000 45%,#000 55%,#fe2c55)", web: "" },
-  whatsapp:  { ar: "واتساب", en: "WhatsApp", bg: "#25d366", web: "https://wa.me/?text=" }
+  whatsapp:  { ar: "واتساب", en: "WhatsApp", bg: "#25d366", web: "https://wa.me/?text=", text: true }
 };
 
 var q = new URLSearchParams(location.search);
 var id = (q.get("id") || "").replace(/[^A-Za-z0-9_-]/g, "");
 var app = (q.get("app") || "").toLowerCase();
-var FILE = null, IMG = "https://lh3.googleusercontent.com/d/" + id;
+var FILE = null, IMG = "https://lh3.googleusercontent.com/d/" + id, CAPTION = "";
 
 function $(i) { return document.getElementById(i); }
 function hint(t) { $("hint").innerHTML = t; }
@@ -71,6 +75,12 @@ function show(d) {
   else { $("ph").src = url; }
   $("dl").href = url;
   $("dl").download = name;
+  CAPTION = d.caption || "";
+  if (CAPTION) {
+    $("capbox").hidden = false;
+    $("cap").textContent = CAPTION;
+    $("copy").onclick = function () { copyText(); hint("✔ تم نسخ النص — Text copied"); };
+  }
   var A = APPS[app];
   var m = $("main");
   m.style.background = A ? A.bg : "linear-gradient(45deg,#f58529,#dd2a7b,#8134af)";
@@ -87,11 +97,22 @@ function show(d) {
   });
 }
 
+function copyText() {
+  if (!CAPTION) return;
+  try { navigator.clipboard.writeText(CAPTION).catch(function () {}); } catch (e) {}
+}
+
 function go(k) {
   var a = APPS[k];
+  copyText();   // Instagram, Facebook, Snapchat and TikTok ignore shared text: the caption waits in the clipboard
   if (FILE && navigator.canShare && navigator.canShare({ files: [FILE] })) {
-    if (a) hint("اختر <b>" + a.ar + "</b> من القائمة (اسحب صف التطبيقات إن لم يظهر)، وستفتح الصورة كمنشور جاهز.<br>Pick <b>" + a.en + "</b> in the list — the photo opens as a ready post.");
-    navigator.share({ files: [FILE] }).catch(function (e) { if (e && e.name !== "AbortError") web(k); });
+    var data = { files: [FILE] };
+    if (CAPTION && (!a || a.text)) data.text = CAPTION;
+    if (CAPTION && data.text && !navigator.canShare(data)) delete data.text;
+    var paste = CAPTION && !data.text ? "<br>📋 النص منسوخ — اضغط مطولاً في خانة الكتابة واختر «لصق». / The caption is copied — paste it in the post." : "";
+    if (a) hint("اختر <b>" + a.ar + "</b> من القائمة (اسحب صف التطبيقات إن لم يظهر)، وستفتح الصورة كمنشور جاهز.<br>Pick <b>" + a.en + "</b> in the list — the photo opens as a ready post." + paste);
+    else if (paste) hint(paste.slice(4));
+    navigator.share(data).catch(function (e) { if (e && e.name !== "AbortError") web(k); });
     return;
   }
   web(k);
@@ -100,7 +121,14 @@ function go(k) {
 // no share sheet (computer browser): the site's own share page, or save-and-post steps
 function web(k) {
   var a = APPS[k];
-  if (a && a.web) { window.open(a.web + encodeURIComponent(IMG), "_blank"); return; }
+  if (a && a.web) {
+    var u = a.web + encodeURIComponent(IMG);
+    if (k === "x" && CAPTION) u = "https://twitter.com/intent/tweet?text=" + encodeURIComponent(CAPTION) + "&url=" + encodeURIComponent(IMG);
+    if (k === "whatsapp" && CAPTION) u = "https://wa.me/?text=" + encodeURIComponent(CAPTION + "\n" + IMG);
+    window.open(u, "_blank");
+    if (CAPTION && k !== "x" && k !== "whatsapp") hint("📋 النص منسوخ — الصقه في المنشور. / The caption is copied — paste it in the post.");
+    return;
+  }
   hint("احفظ الصورة (اضغط مطولاً عليها أو «تحميل»)، ثم افتح التطبيق وأضفها كمنشور.<br>Save the photo (long-press or Download), then add it as a post in the app.");
 }
 
